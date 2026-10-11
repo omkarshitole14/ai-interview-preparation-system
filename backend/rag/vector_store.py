@@ -1,7 +1,7 @@
 import json
 import time
 from pathlib import Path
-
+from app.core.config import QDRANT_API_KEY, QDRANT_URL
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
 from langchain_qdrant import QdrantVectorStore
@@ -26,6 +26,7 @@ VECTOR_STORE_PATH = (
 )
 
 COLLECTION_NAME = "python_interview_knowledge"
+USE_QDRANT_CLOUD = bool(QDRANT_URL and QDRANT_API_KEY)
 
 EMBEDDING_BATCH_SIZE = 20
 EMBEDDING_BATCH_DELAY = 65
@@ -198,20 +199,23 @@ def load_documents() -> list[Document]:
     return documents
 
 
+
 def delete_existing_collection() -> None:
-    """
-    Explicitly remove the existing local Qdrant collection.
+    """Delete the existing collection from the configured Qdrant store."""
 
-    This prevents stale points from previous or interrupted
-    ingestion runs from remaining in the knowledge base.
-    """
+    if USE_QDRANT_CLOUD:
+        client = QdrantClient(
+            url=QDRANT_URL,
+            api_key=QDRANT_API_KEY,
+            timeout=30,
+        )
+    else:
+        if not VECTOR_STORE_PATH.exists():
+            return
 
-    if not VECTOR_STORE_PATH.exists():
-        return
-
-    client = QdrantClient(
-        path=str(VECTOR_STORE_PATH)
-    )
+        client = QdrantClient(
+            path=str(VECTOR_STORE_PATH)
+        )
 
     try:
         if client.collection_exists(COLLECTION_NAME):
@@ -219,15 +223,13 @@ def delete_existing_collection() -> None:
                 f"Deleting existing Qdrant collection: "
                 f"{COLLECTION_NAME}"
             )
-
             client.delete_collection(
                 collection_name=COLLECTION_NAME
             )
-
             print("Existing Qdrant collection deleted.")
-
     finally:
         client.close()
+
 
 
 def create_vector_store(
@@ -245,18 +247,25 @@ def create_vector_store(
     )
 
     print()
-    print(
-        "Creating a fresh Qdrant collection..."
-    )
+    print("Creating a fresh Qdrant collection...")
 
-    vector_store = QdrantVectorStore.from_documents(
-        documents=documents,
-        embedding=ingestion_embeddings,
-        path=str(VECTOR_STORE_PATH),
-        collection_name=COLLECTION_NAME,
-        force_recreate=True,
-        batch_size=EMBEDDING_BATCH_SIZE,
-    )
+    if USE_QDRANT_CLOUD:
+        vector_store = QdrantVectorStore.from_documents(
+            documents=documents,
+            embedding=ingestion_embeddings,
+            url=QDRANT_URL,
+            api_key=QDRANT_API_KEY,
+            collection_name=COLLECTION_NAME,
+            batch_size=EMBEDDING_BATCH_SIZE,
+        )
+    else:
+        vector_store = QdrantVectorStore.from_documents(
+            documents=documents,
+            embedding=ingestion_embeddings,
+            path=str(VECTOR_STORE_PATH),
+            collection_name=COLLECTION_NAME,
+            batch_size=EMBEDDING_BATCH_SIZE,
+        )
 
     return vector_store
 
@@ -265,17 +274,35 @@ def get_vector_store() -> tuple[
     QdrantVectorStore,
     QdrantClient,
 ]:
-    client = QdrantClient(
-        path=str(VECTOR_STORE_PATH)
-    )
+    if USE_QDRANT_CLOUD:
+        client = QdrantClient(
+            url=QDRANT_URL,
+            api_key=QDRANT_API_KEY,
+            timeout=30,
+        )
+    else:
+        client = QdrantClient(
+            path=str(VECTOR_STORE_PATH)
+        )
 
-    vector_store = QdrantVectorStore(
-        client=client,
-        collection_name=COLLECTION_NAME,
-        embedding=embeddings,
-    )
+    try:
+        if not client.collection_exists(COLLECTION_NAME):
+            raise RuntimeError(
+                f"Qdrant collection '{COLLECTION_NAME}' "
+                "does not exist. Run knowledge-base ingestion first."
+            )
 
-    return vector_store, client
+        vector_store = QdrantVectorStore(
+            client=client,
+            collection_name=COLLECTION_NAME,
+            embedding=embeddings,
+        )
+
+        return vector_store, client
+
+    except Exception:
+        client.close()
+        raise
 
 
 def build_vector_store() -> QdrantVectorStore:
