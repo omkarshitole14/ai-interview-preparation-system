@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
-
+import { useEffect, useState } from "react";
 import {
   evaluateInterviewAnswer,
   type InterviewAnswerEvaluation,
   type InterviewQuestionResponse,
   type InterviewType,
+  type SavedInterviewSession,
 } from "@/services/interviewApi";
 
 type InterviewQuestionsProps = {
@@ -17,6 +17,9 @@ type InterviewQuestionsProps = {
     questionCount: 5 | 10 | 15,
   ) => void;
   tokenGetter: () => string;
+  sessionId: number | null;
+  savedInterview: SavedInterviewSession | null;
+  onRefreshSavedInterview: () => Promise<void>;
 };
 
 const interviewTypeOptions: Array<{
@@ -45,6 +48,9 @@ export default function InterviewQuestions({
   generating,
   onGenerate,
   tokenGetter,
+  sessionId,
+  savedInterview,
+  onRefreshSavedInterview,
 }: InterviewQuestionsProps) {
   const [interviewType, setInterviewType] =
     useState<InterviewType>("mixed");
@@ -63,6 +69,34 @@ export default function InterviewQuestions({
 
   const [evaluationErrors, setEvaluationErrors] =
     useState<Record<number, string>>({});
+
+  useEffect(() => {
+  if (!savedInterview) {
+    setAnswers({});
+    setEvaluations({});
+    return;
+  }
+
+  const nextAnswers: Record<number, string> = {};
+  const nextEvaluations: Record<
+    number,
+    InterviewAnswerEvaluation
+  > = {};
+
+  for (const question of savedInterview.questions) {
+    if (question.answer !== null) {
+      nextAnswers[question.id] = question.answer;
+    }
+
+    if (question.evaluation !== null) {
+      nextEvaluations[question.id] =
+        question.evaluation;
+    }
+  }
+
+  setAnswers(nextAnswers);
+  setEvaluations(nextEvaluations);
+}, [savedInterview]);
 
   const handleEvaluate = async (questionId: number) => {
     const answer = answers[questionId]?.trim();
@@ -114,9 +148,11 @@ export default function InterviewQuestions({
       );
 
       setEvaluations((prev) => ({
-        ...prev,
-        [questionId]: result,
-      }));
+  ...prev,
+  [questionId]: result,
+}));
+
+await onRefreshSavedInterview();
     } catch (error) {
       setEvaluationErrors((prev) => ({
         ...prev,
@@ -295,6 +331,7 @@ export default function InterviewQuestions({
                         value={
                           answers[questionId] || ""
                         }
+                        disabled={Boolean(evaluations[questionId])}
                         onChange={(event) => {
                           const value =
                             event.target.value;
@@ -356,7 +393,9 @@ export default function InterviewQuestions({
                             )
                           }
                           disabled={
-                            evaluating !== null
+                            evaluating !== null ||
+                            Boolean(evaluations[questionId])
+
                           }
                           className="rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
                         >

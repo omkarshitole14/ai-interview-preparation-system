@@ -1,12 +1,18 @@
+
 import json
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.models.evaluation import Evaluation
 from app.models.interview_answer import InterviewAnswer
-from app.models.interview_question import InterviewQuestion as InterviewQuestionModel
+from app.models.interview_question import (
+    InterviewQuestion as InterviewQuestionModel,
+)
 from app.models.interview_session import InterviewSession
-from app.schemas.interview import InterviewAnswerEvaluation, InterviewQuestion
+from app.schemas.interview import (
+    InterviewAnswerEvaluation,
+    InterviewQuestion,
+)
 
 
 def create_interview_session(
@@ -40,6 +46,26 @@ def get_interview_session(
     )
 
 
+def get_session_with_questions(
+    db: Session,
+    session_id: int,
+    user_id: int,
+) -> InterviewSession | None:
+    return (
+        db.query(InterviewSession)
+        .options(
+            joinedload(InterviewSession.questions)
+            .joinedload(InterviewQuestionModel.answer)
+            .joinedload(InterviewAnswer.evaluation)
+        )
+        .filter(
+            InterviewSession.id == session_id,
+            InterviewSession.user_id == user_id,
+        )
+        .first()
+    )
+
+
 def delete_questions_for_session(
     db: Session,
     session_id: int,
@@ -47,7 +73,6 @@ def delete_questions_for_session(
     db.query(InterviewQuestionModel).filter(
         InterviewQuestionModel.session_id == session_id
     ).delete(synchronize_session=False)
-
     db.flush()
 
 
@@ -59,7 +84,7 @@ def create_questions(
     question_models = []
 
     for index, question in enumerate(questions, start=1):
-        question_model = InterviewQuestionModel(
+        model = InterviewQuestionModel(
             session_id=session_id,
             question=question.question,
             category=question.category,
@@ -67,9 +92,8 @@ def create_questions(
             expected_topics=json.dumps(question.expected_topics),
             question_order=index,
         )
-
-        db.add(question_model)
-        question_models.append(question_model)
+        db.add(model)
+        question_models.append(model)
 
     db.flush()
     return question_models
@@ -99,15 +123,13 @@ def create_answer(
     question_id: int,
     answer: str,
 ) -> InterviewAnswer:
-    answer_model = InterviewAnswer(
+    model = InterviewAnswer(
         question_id=question_id,
         answer=answer,
     )
-
-    db.add(answer_model)
+    db.add(model)
     db.flush()
-
-    return answer_model
+    return model
 
 
 def create_evaluation(
@@ -115,15 +137,13 @@ def create_evaluation(
     answer_id: int,
     evaluation: InterviewAnswerEvaluation,
 ) -> Evaluation:
-    evaluation_model = Evaluation(
+    model = Evaluation(
         answer_id=answer_id,
         score=evaluation.score,
         feedback=evaluation.feedback,
         strengths=json.dumps(evaluation.strengths),
         improvements=json.dumps(evaluation.improvements),
     )
-
-    db.add(evaluation_model)
+    db.add(model)
     db.flush()
-
-    return evaluation_model
+    return model

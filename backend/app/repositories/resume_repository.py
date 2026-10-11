@@ -58,3 +58,15 @@ def get_candidate_profile(
     data = json.loads(resume.candidate_profile_json)
 
     return CandidateProfile.model_validate(data)
+
+
+def get_resumes_for_user(
+    db: Session,
+    user_id: int,
+) -> list[Resume]:
+    return (
+        db.query(Resume)
+        .filter(Resume.user_id == user_id)
+        .order_by(Resume.created_at.desc())
+        .all()
+    )

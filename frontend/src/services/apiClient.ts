@@ -34,6 +34,7 @@ export async function authenticatedFetch(
   let response = await fetch(url, {
     ...options,
     headers,
+    credentials: "include",
   });
 
   if (response.status !== 401) {
@@ -58,6 +59,7 @@ export async function authenticatedFetch(
     response = await fetch(url, {
       ...options,
       headers: retryHeaders,
+      credentials: "include",
     });
 
     if (response.status === 401) {

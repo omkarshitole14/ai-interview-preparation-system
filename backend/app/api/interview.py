@@ -1,3 +1,4 @@
+
 import json
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -13,6 +14,7 @@ from app.repositories.interview_repository import (
     delete_questions_for_session,
     get_interview_session,
     get_question_for_user,
+    get_session_with_questions,
 )
 from app.repositories.resume_repository import get_candidate_profile
 from app.schemas.interview import (
@@ -28,17 +30,65 @@ from app.services.interview_service import (
     generate_interview_questions,
 )
 
-router = APIRouter(
-    prefix="/api/interview",
-    tags=["Interview"],
-)
+router = APIRouter(prefix="/api/interview", tags=["Interview"])
 
 
 @router.get("/health")
 def interview_health():
+    return {"status": "ok", "module": "interview"}
+
+
+@router.get("/sessions/{session_id}")
+def get_saved_interview(
+    session_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    session = get_session_with_questions(
+        db,
+        session_id,
+        current_user.id,
+    )
+
+    if session is None:
+        raise HTTPException(404, "Interview session not found.")
+
+    questions = []
+
+    for item in sorted(
+        session.questions,
+        key=lambda question: question.question_order,
+    ):
+        answer = item.answer
+        evaluation = answer.evaluation if answer else None
+
+        questions.append({
+            "id": item.id,
+            "question": item.question,
+            "category": item.category,
+            "difficulty": item.difficulty,
+            "expected_topics": json.loads(item.expected_topics),
+            "answer": answer.answer if answer else None,
+            "evaluation": (
+                {
+                    "score": evaluation.score,
+                    "feedback": evaluation.feedback,
+                    "strengths": json.loads(evaluation.strengths),
+                    "improvements": json.loads(evaluation.improvements),
+                    "time_complexity": None,
+                    "space_complexity": None,
+                }
+                if evaluation else None
+            ),
+        })
+
     return {
-        "status": "ok",
-        "module": "interview",
+        "session_id": session.id,
+        "resume_id": session.resume_id,
+        "status": session.status,
+        "interview_type": session.interview_type,
+        "question_count": session.question_count,
+        "questions": questions,
     }
 
 
@@ -58,9 +108,12 @@ def generate_questions(
     )
 
     if session is None:
+        raise HTTPException(404, "Interview session not found.")
+
+    if any(question.answer is not None for question in session.questions):
         raise HTTPException(
-            status_code=404,
-            detail="Interview session not found.",
+            409,
+            "This interview already has saved answers. Create a new resume session to start another interview.",
         )
 
     candidate_profile = get_candidate_profile(
@@ -70,10 +123,7 @@ def generate_questions(
     )
 
     if candidate_profile is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Candidate profile not found.",
-        )
+        raise HTTPException(404, "Candidate profile not found.")
 
     try:
         result = generate_interview_questions(
@@ -82,10 +132,7 @@ def generate_questions(
             question_count=request.question_count,
         )
 
-        delete_questions_for_session(
-            db,
-            session.id,
-        )
+        delete_questions_for_session(db, session.id)
 
         question_models = create_questions(
             db,
@@ -99,43 +146,30 @@ def generate_questions(
 
         db.commit()
 
-        saved_questions = [
-            InterviewQuestion(
-                id=model.id,
-                question=model.question,
-                category=model.category,
-                difficulty=model.difficulty,
-                expected_topics=json.loads(model.expected_topics),
-            )
-            for model in question_models
-        ]
-
         return InterviewQuestionResponse(
-            questions=saved_questions,
+            questions=[
+                InterviewQuestion(
+                    id=model.id,
+                    question=model.question,
+                    category=model.category,
+                    difficulty=model.difficulty,
+                    expected_topics=json.loads(model.expected_topics),
+                )
+                for model in question_models
+            ],
         )
 
     except RuntimeError as exc:
         db.rollback()
-
-        raise HTTPException(
-            status_code=503,
-            detail=str(exc),
-        ) from exc
-
+        raise HTTPException(503, detail=str(exc)) from exc
     except ValueError as exc:
         db.rollback()
-
-        raise HTTPException(
-            status_code=400,
-            detail=str(exc),
-        ) from exc
-
+        raise HTTPException(400, detail=str(exc)) from exc
     except Exception as exc:
         db.rollback()
-
         raise HTTPException(
-            status_code=500,
-            detail="Failed to generate interview questions.",
+            500,
+            "Failed to generate interview questions.",
         ) from exc
 
 
@@ -155,23 +189,17 @@ def evaluate_answer(
     )
 
     if question is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Interview question not found.",
-        )
+        raise HTTPException(404, "Interview question not found.")
 
     answer = request.answer.strip()
 
     if not answer:
-        raise HTTPException(
-            status_code=400,
-            detail="Answer cannot be empty.",
-        )
+        raise HTTPException(400, "Answer cannot be empty.")
 
     if question.answer is not None:
         raise HTTPException(
-            status_code=409,
-            detail="This question has already been answered.",
+            409,
+            "This question has already been answered. Its saved evaluation is available in your interview history.",
         )
 
     try:
@@ -200,31 +228,19 @@ def evaluate_answer(
         )
 
         question.session.status = "in_progress"
-
         db.commit()
 
         return evaluation
 
     except RuntimeError as exc:
         db.rollback()
-
-        raise HTTPException(
-            status_code=503,
-            detail=str(exc),
-        ) from exc
-
+        raise HTTPException(503, detail=str(exc)) from exc
     except ValueError as exc:
         db.rollback()
-
-        raise HTTPException(
-            status_code=400,
-            detail=str(exc),
-        ) from exc
-
+        raise HTTPException(400, detail=str(exc)) from exc
     except Exception as exc:
         db.rollback()
-
         raise HTTPException(
-            status_code=500,
-            detail="Failed to evaluate interview answer.",
+            500,
+            "Failed to evaluate interview answer.",
         ) from exc
