@@ -487,7 +487,34 @@ export default function Home() {
               </button>
             </div>
           </header>
+          
+          
+          {/* Mobile navigation */}
+          <nav
+            aria-label="Mobile workspace navigation"
+            className="grid grid-cols-3 gap-2 border-b border-slate-200 bg-white px-3 py-3 md:hidden"
+          >
+            <MobileNavButton
+              active={activeTab === "resume"}
+              onClick={() => setActiveTab("resume")}
+            >
+              Resume
+            </MobileNavButton>
 
+            <MobileNavButton
+              active={activeTab === "interview"}
+              onClick={() => setActiveTab("interview")}
+            >
+              Interview
+            </MobileNavButton>
+
+            <MobileNavButton
+              active={activeTab === "reports"}
+              onClick={() => setActiveTab("reports")}
+            >
+              Reports
+            </MobileNavButton>
+          </nav>
           <div className="mx-auto max-w-7xl space-y-8 px-6 py-8">
             {restoreError && (
               <div
@@ -724,5 +751,31 @@ function InfoCard({
       </p>
       <p className="mt-1 text-xs text-slate-400">Items detected</p>
     </div>
+  );
+}
+
+
+function MobileNavButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-current={active ? "page" : undefined}
+      className={`min-h-11 rounded-lg px-2 py-3 text-center text-sm font-medium transition-colors ${
+        active
+          ? "bg-slate-900 text-white"
+          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+      }`}
+    >
+      {children}
+    </button>
   );
 }
