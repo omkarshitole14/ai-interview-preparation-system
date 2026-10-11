@@ -1,175 +1,264 @@
 ﻿# AI Interview Preparation System with RAG
 
-An AI-powered interview preparation application built with FastAPI, Next.js, Google Gemini, and Retrieval-Augmented Generation (RAG).
+An AI-powered interview preparation platform that helps candidates analyze their resumes, practice interview questions, receive AI-generated feedback, and explore technical interview concepts using Retrieval-Augmented Generation (RAG).
 
-The system combines resume analysis, candidate profile extraction, interview question generation, answer evaluation, and retrieval from a PDF-based knowledge base.
+**Live Demo:** https://ai-interview-preparation-system-os.vercel.app/
+
+**GitHub Repository:** https://github.com/omkarshitole14/ai-interview-preparation-system
+
+## Overview
+
+Preparing for technical interviews requires more than memorizing answers. Candidates need to understand their own resumes, practice relevant questions, identify weaknesses, and learn concepts clearly.
+
+This project brings these activities together in one web application. It combines resume analysis, AI-assisted interview practice, persistent interview history, and a RAG-based assistant for technical learning.
 
 ## Features
 
-- User authentication and refresh-token session management
-- Resume upload and analysis
-- Candidate profile extraction
-- AI-generated interview questions
-- Interview answer evaluation
-- RAG-based retrieval from PDF documents
-- Local, file-based Qdrant vector search
-- PostgreSQL database with SQLAlchemy and Alembic migrations
-- Next.js frontend and FastAPI backend
+### Resume Analysis
+- Upload a resume in PDF format.
+- Extract and display resume text.
+- Analyze candidate information, including education, skills, projects, experience, and certifications.
+- Save and restore resume analysis through the backend.
 
-## Tech Stack
+### AI Interview Practice
+- Generate interview questions based on the selected interview type.
+- Practice technical, HR, resume-based, coding, machine learning, and Generative AI/RAG interviews.
+- Submit answers for AI-based evaluation.
+- Review scores, feedback, strengths, and areas for improvement.
+- Retrieve saved interview questions, answers, and evaluations.
 
-### Backend
-- Python
-- FastAPI
-- SQLAlchemy and Alembic
-- PostgreSQL
-- Google Gemini API
-- LangChain
-- Qdrant
+### RAG Assistant
+- Retrieve relevant information from an interview-preparation knowledge base.
+- Generate context-aware responses using retrieved content and a language model.
+- Support learning and revision of technical interview concepts.
 
-### Frontend
-- Next.js
-- React
-- TypeScript
+### Progress Tracking
+- View interview question counts and evaluation progress.
+- Restore saved work after signing in again.
+- Review the progress of the currently restored interview session.
+
+### Authentication and Responsive UI
+- User authentication and protected API requests.
+- Frontend and backend separation.
+- Responsive interface for desktop and mobile devices.
+
+## Technology Stack
+
+| Area | Technologies |
+|---|---|
+| Frontend | Next.js, React, TypeScript, Tailwind CSS |
+| Backend | Python, FastAPI |
+| AI / LLM | Google Gemini |
+| Retrieval-Augmented Generation | LangChain and Qdrant |
+| Relational database | Neon PostgreSQL |
+| Vector database | Qdrant Cloud |
+| Resume processing | PDF text extraction and candidate-profile parsing |
+| Deployment | Vercel and Render |
+| Version control | Git and GitHub |
+
+## Architecture
+
+The application uses a separate frontend and backend. The frontend communicates with FastAPI through HTTP API requests. The backend handles authentication, resume processing, interview workflows, persistence, and RAG operations.
+
+```text
+                 Candidate
+                    |
+                    v
+          Next.js Frontend
+             (Vercel)
+                    |
+              HTTP / REST
+                    |
+                    v
+            FastAPI Backend
+               (Render)
+              /     |     \
+             /      |      \
+            v       v       v
+         Neon    Gemini   Qdrant
+       PostgreSQL  API    Cloud
+                    ^
+                    |
+             Retrieved Context
+                    |
+          Interview Knowledge Base
+```
+
+**Typical RAG workflow**
+
+1. The user asks a technical question.
+2. The backend converts the query into a retrieval request.
+3. Relevant knowledge-base content is retrieved from the vector database.
+4. The retrieved context is supplied to the language model.
+5. The model generates a response grounded in the available context.
 
 ## Project Structure
 
 ```text
-.
+ai-interview-preparation-system/
 ├── backend/
 │   ├── app/
-│   ├── alembic/
-│   ├── rag/
+│   │   ├── api/
+│   │   ├── core/
+│   │   ├── models/
+│   │   ├── repositories/
+│   │   └── ...
 │   ├── tests/
+│   ├── migrate_qdrant_to_cloud.py
 │   └── requirements.txt
 ├── frontend/
+│   ├── src/
+│   │   ├── app/
+│   │   ├── components/
+│   │   ├── services/
+│   │   └── ...
+│   └── package.json
 ├── knowledge_based/
-│   └── documents/
-├── .gitignore
+│   ├── documents/
+│   └── processed/
 └── README.md
 ```
 
-## Prerequisites
+*The tree highlights the main project areas; individual files may differ as the project evolves.*
 
-- Python version compatible with `backend/requirements.txt`
+## Live Deployment
+
+| Component | Deployment |
+|---|---|
+| Frontend | [Open the application](https://ai-interview-preparation-system-os.vercel.app/) |
+| Backend API | [Open API documentation](https://ai-interview-preparation-system-api.onrender.com/docs) |
+| Source code | [GitHub repository](https://github.com/omkarshitole14/ai-interview-preparation-system) |
+
+The frontend is deployed on Vercel, and the FastAPI backend is deployed on Render. The backend uses hosted database and AI services configured through environment variables.
+
+## Run Locally
+
+### Prerequisites
+
+Install the following before starting:
+
+- Python compatible with the backend dependencies
 - Node.js and npm
-- PostgreSQL, with the application database created
-- A Google Gemini API key
+- Git
+- Access credentials for the external AI and database services required by the application
 
-Qdrant runs locally using a file-based store under `knowledge_based/vector_store`; a separate Qdrant server is not required by the current implementation.
+### 1. Clone the repository
 
-## Environment Configuration
-
-Create a root `.env` file. Do not commit it.
-
-```env
-GEMINI_API_KEY=
-DB_USER=postgres
-DB_PASSWORD=
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=ai_interview_db
-
-JWT_SECRET_KEY=
-JWT_ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=30
-REFRESH_TOKEN_EXPIRE_DAYS=30
-REFRESH_TOKEN_COOKIE_NAME=refresh_token
-REFRESH_TOKEN_COOKIE_SECURE=false
-REFRESH_TOKEN_COOKIE_SAMESITE=lax
-
-FRONTEND_URL=http://localhost:3000
+```bash
+git clone https://github.com/omkarshitole14/ai-interview-preparation-system.git
+cd ai-interview-preparation-system
 ```
 
-The values above are local-development examples. Use a strong, randomly generated `JWT_SECRET_KEY` and valid credentials for your environment.
+### 2. Set up the backend
 
-The frontend uses `frontend/.env.local`. Set `NEXT_PUBLIC_API_URL` to the backend API base URL expected by the frontend.
+From the repository root:
 
-Never commit `.env` files, API keys, database passwords, or JWT secrets.
+```powershell
+cd backend
+python -m venv venv
+```
 
-## Backend Setup
-
-From the project root, activate your existing virtual environment and install the backend dependencies:
+Activate the virtual environment on Windows:
 
 ```powershell
 .\venv\Scripts\Activate.ps1
-pip install -r backend\requirements.txt
 ```
 
-Ensure PostgreSQL is running, the database exists, and the root `.env` contains valid settings.
-
-Run the database migrations:
+Install the backend dependencies:
 
 ```powershell
-Set-Location backend
-alembic upgrade head
+pip install -r requirements.txt
 ```
 
-Start the backend from the `backend` directory:
+Configure the required environment variables using the names expected by `backend/app/core/config.py`. These may include AI-provider credentials, the PostgreSQL connection string, and Qdrant Cloud credentials.
+
+Start the backend using the application's configured FastAPI entry point. For example, if the entry point is `app.main:app`:
 
 ```powershell
-python -m uvicorn app.main:app --reload
+uvicorn app.main:app --reload
 ```
 
-Local endpoints:
+The API documentation is typically available at `http://127.0.0.1:8000/docs`.
 
-- API root: `http://127.0.0.1:8000/`
-- Health check: `http://127.0.0.1:8000/health`
-- Interactive API documentation: `http://127.0.0.1:8000/docs`
+### 3. Set up the frontend
 
-## Frontend Setup
-
-Open a second terminal in the project root:
+Open another terminal from the repository root:
 
 ```powershell
-Set-Location frontend
+cd frontend
 npm install
-npm run dev
 ```
 
-The frontend development server normally runs at `http://localhost:3000`.
+Create a local `.env.local` file:
 
-Available npm scripts:
+```env
+NEXT_PUBLIC_API_URL=http://127.0.0.1:8000
+```
+
+Ensure this URL matches the port on which your backend is running.
+
+Start the frontend:
 
 ```powershell
 npm run dev
-npm run build
-npm run start
-npm run lint
 ```
 
-## Knowledge Base Ingestion
+Open `http://localhost:3000` in your browser.
 
-The ingestion pipeline processes PDF documents, creates chunks, and indexes them in the local Qdrant store.
+**Configuration note:** Verify the backend entry point and required environment-variable names against the current source code before running the application. Never commit `.env`, `.env.local`, API keys, passwords, or database credentials to GitHub.
 
-The PDF source directory is `knowledge_based/documents`. From the project root, run:
+## API Overview
 
-```powershell
-Set-Location backend
-python -m rag.ingest
-```
+The backend exposes API endpoints for the main application workflows, including:
 
-**Warning:** ingestion recreates the configured Qdrant collection. It may call the Gemini embedding API and incur API usage or quota limits. Run it only when you intend to rebuild the index.
+- Authentication and current-user information.
+- Resume upload, analysis, history, and retrieval.
+- Interview question generation and session retrieval.
+- Answer evaluation.
+- RAG-based question answering.
 
-Generated chunks and the local vector store are excluded from Git.
+Open the [deployed API documentation](https://ai-interview-preparation-system-api.onrender.com/docs) to inspect the available endpoints, request schemas, and response formats.
 
-## Testing
+## Engineering Considerations
 
-From the project root:
+This project demonstrates practical experience with:
 
-```powershell
-Set-Location backend
-python -m pytest
-```
+- Separating a Next.js frontend from a FastAPI backend.
+- Designing REST API integrations.
+- Handling authentication and authenticated requests.
+- Persisting application data in a relational database.
+- Using vector search for retrieval-augmented generation.
+- Integrating an external LLM API.
+- Deploying and debugging a multi-service application.
+- Managing application state and restoring saved work.
+- Building a responsive interface for desktop and mobile devices.
 
-## Security and Deployment Notes
+## Current Scope
 
-- Keep API keys and database credentials in environment variables.
-- Use a strong JWT secret and rotate it if it has been exposed.
-- Configure CORS for the intended frontend origin before deployment; verify the backend CORS implementation rather than assuming `FRONTEND_URL` is already applied.
-- Configure secure refresh-token cookies and HTTPS for production.
-- Do not commit virtual environments, environment files, caches, generated vector stores, or local databases.
+The Reports section currently provides an interview progress summary. A downloadable PDF interview report should only be considered implemented once report generation and download functionality have been added and verified.
 
-## Project Status
+AI-generated feedback may occasionally be inaccurate. Candidates should use it as a practice aid rather than as a definitive assessment of their skills.
 
-This project is under active development. Features, setup instructions, and deployment configuration may evolve.
+## Future Improvements
+
+Potential future enhancements include:
+
+- Downloadable interview performance reports.
+- More detailed performance analytics across interview sessions.
+- Improved retrieval quality and knowledge-base coverage.
+- Additional interview categories and coding exercises.
+- More comprehensive automated testing.
+
+## Author
+
+**Omkar Shitole**
+
+Final-semester B.Tech student in Electronics and Telecommunication Engineering, building projects in AI/ML, Generative AI, Python, and software development.
+
+- **GitHub:** https://github.com/omkarshitole14
+- **LinkedIn:** https://www.linkedin.com/in/omkarshitole14/
+- **Portfolio:** https://omkarshitole-portfolio.vercel.app/
+
+---
+
+*Built as a practical project to explore AI-assisted interview preparation, RAG, backend API development, data persistence, and full-stack deployment.*
